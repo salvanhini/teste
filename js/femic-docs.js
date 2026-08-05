@@ -982,6 +982,12 @@ function femicLogout(){
 function checkFemicAuth(){
   const jwt     = sessionStorage.getItem('femic_jwt');
   const overlay = document.getElementById('femicLoginOverlay');
+  if(window.FEMIC_DEMO){
+    if(overlay) overlay.style.display = 'none';
+    const demoLabel = document.getElementById('loginUserLabel');
+    if(demoLabel) demoLabel.textContent = 'Demonstração';
+    return;
+  }
   const saved   = getSavedSupabase();
   const hasConfig = !!(saved.url && saved.key);
   if(!jwt){
@@ -1007,6 +1013,17 @@ function checkFemicAuth(){
 }
 
 checkFemicAuth();
+if(window.FEMIC_DEMO){
+  store = {
+    source:'Demonstração local',
+    patients:JSON.parse(localStorage.getItem('femic_patients') || '[]'),
+    sessions:JSON.parse(localStorage.getItem('femic_sessions') || '[]'),
+    anamneses:JSON.parse(localStorage.getItem('femic_anamneses') || '[]'),
+    evolutions:JSON.parse(localStorage.getItem('femic_clinical_evolutions') || '[]'),
+    documents:JSON.parse(localStorage.getItem('femic_documents') || '[]')
+  };
+  afterLoad();
+}
 document.getElementById('docDateInput').value = todayIso();
 populatePresets();
 renderPhraseList();

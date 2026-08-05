@@ -2706,6 +2706,12 @@ function supabaseHeaders(post){
   function checkFemicAuth(){
     const jwt     = sessionStorage.getItem('femic_jwt');
     const overlay = document.getElementById('femicLoginOverlay');
+    if(window.FEMIC_DEMO){
+      if(overlay) overlay.style.display = 'none';
+      const demoLabel = document.getElementById('loginUserLabel');
+      if(demoLabel) demoLabel.textContent = 'Demonstração';
+      return;
+    }
     const cfg     = getConfig();
     const hasConfig = !!(cfg.supabaseUrl && cfg.supabaseKey);
     if(!jwt){

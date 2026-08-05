@@ -1498,6 +1498,12 @@ function femicLogout(){
 function checkFemicAuth(){
   const jwt     = sessionStorage.getItem('femic_jwt');
   const overlay = document.getElementById('femicLoginOverlay');
+  if(window.FEMIC_DEMO){
+    if(overlay) overlay.style.display = 'none';
+    const demoLabel = document.getElementById('loginUserLabel');
+    if(demoLabel) demoLabel.textContent = 'Demonstração';
+    return;
+  }
   const hasConfig = !!(localStorage.femic_agenda_url && localStorage.femic_agenda_key);
   if(!jwt){
     if(overlay) overlay.style.display = 'flex';
@@ -1531,7 +1537,7 @@ function processAutomaticReminders(){
   sendWhatsapp(next.a.id,true,next.kind);
 }
 
-applyAgendaTheme();renderWorkDays();renderReminderAutomationStatus();syncAgendaNavState('dashboard');renderAll();if(base()&&key()&&sessionStorage.getItem('femic_jwt'))loadAll(true);
+femicDemoAgendaSeed();applyAgendaTheme();renderWorkDays();renderReminderAutomationStatus();syncAgendaNavState('dashboard');renderAll();if(window.FEMIC_DEMO)loadAll(true);else if(base()&&key()&&sessionStorage.getItem('femic_jwt'))loadAll(true);
 function hasOpenModal(){
   return !!document.querySelector('.modal-backdrop.show');
 }
