@@ -1,5 +1,18 @@
 # FEMIC
 
+## Versão de demonstração
+
+Esta cópia foi preparada para apresentação pública no GitHub Pages:
+
+- abre sem login, banco de dados ou configuração de chaves;
+- traz somente dados fictícios;
+- salva alterações apenas no navegador de cada visitante;
+- bloqueia o envio por WhatsApp e não configura integrações de IA ou Supabase.
+
+Para publicar, envie todos os arquivos para um repositório e ative `Settings` > `Pages` > `Deploy from a branch` > `main` > `/(root)`. O endereço inicial será o link fornecido pelo GitHub Pages.
+
+Para reiniciar os exemplos em um navegador, apague os dados do site nas configurações do navegador e abra o link novamente.
+
 Sistema clínico da FEMIC Fisioterapia com:
 - gestão de pacientes
 - evolução clínica e técnica
