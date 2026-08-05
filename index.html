@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>FEMIC Fisioterapia — v3.5.0 PWA</title>
+  <meta name="theme-color" content="#0b3c6f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="manifest-femic.webmanifest" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/femic.css">
+  <!-- html2pdf removido: substituído por window.print() nativo (compatível com Safari/iPad) -->
+  
+  
+
+  
+
+</head>
+<body>
+  <div class="mobile-topbar">
+    <button class="btn-icon" onclick="toggleSidebar()">☰</button>
+    <div class="mobile-brand"><img src="logo.png" alt="FEMIC" class="mobile-brand-logo" /><strong>FEMIC</strong></div>
+    <button class="btn-icon" onclick="toggleTheme()">🌓</button>
+  </div>
+  <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+  <div class="toast-wrap" id="toastWrap"></div>
+  <!-- ===== FEMIC LOGIN OVERLAY ===== -->
+  <div id="femicLoginOverlay" style="
+    position:fixed; inset:0; z-index:9999;
+    background: linear-gradient(135deg, #0b3c6f 0%, #0f5c5c 60%, #1fb6e9 100%);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    overflow-y: auto;
+  ">
+    <div style="
+      background:#fff; border-radius:28px; padding:36px 32px;
+      width:min(440px,100%); box-shadow:0 30px 60px rgba(0,0,0,.28);
+      max-height: calc(100vh - 40px); overflow-y: auto;
+      margin: auto;
+    ">
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-size:2.4rem; font-weight:800; letter-spacing:.08em; color:#0b3c6f;">FEMIC</div>
+        <div style="color:#678282; margin-top:6px; font-size:.95rem;">Fisioterapia · Araraquara, SP</div>
+      </div>
+
+      <!-- PASSO 1: Configuração Supabase (só na 1ª vez) -->
+      <div id="loginStep1">
+        <div style="background:#f0f9ff; border:1.5px solid #bae6fd; border-radius:16px; padding:14px 16px; margin-bottom:20px; display:flex; gap:10px;">
+          <span style="font-size:1.3rem">⚙️</span>
+          <div>
+            <strong style="color:#0369a1; font-size:.9rem;">Primeiro acesso</strong>
+            <div style="color:#0284c7; font-size:.8rem; margin-top:3px;">Informe as credenciais do Supabase. Isso é feito uma única vez.</div>
+          </div>
+        </div>
+        <div style="display:grid; gap:14px;">
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">URL do projeto Supabase</label>
+            <input id="setupUrl" type="text" placeholder="https://xxxx.supabase.co"
+              style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:.95rem; outline:none; box-sizing:border-box; transition:.2s;"
+              onfocus="this.style.borderColor='#1fb6e9'; this.style.boxShadow='0 0 0 3px rgba(31,182,233,.15)'"
+              onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+          </div>
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">Chave anônima (anon key)</label>
+            <input id="setupKey" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:.78rem; outline:none; box-sizing:border-box; transition:.2s; font-family:monospace;"
+              onfocus="this.style.borderColor='#1fb6e9'; this.style.boxShadow='0 0 0 3px rgba(31,182,233,.15)'"
+              onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+          </div>
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">IA padrão para preenchimento clínico</label>
+            <select id="setupAiProvider"
+              style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:.95rem; outline:none; box-sizing:border-box; transition:.2s;"
+              onfocus="this.style.borderColor='#1fb6e9'; this.style.boxShadow='0 0 0 3px rgba(31,182,233,.15)'"
+              onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+              <option value="gemini">Google Gemini (2.5 Flash)</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; color:#466; font-size:.86rem;">
+            <input id="setupAiConcise" type="checkbox" checked />
+            Modo econômico de tokens (resposta mais concisa)
+          </label>
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">
+              Chave API Google Gemini (2.5 Flash)
+              <span style="color:#94a3b8; font-size:.8rem;">(opcional)</span>
+              <button type="button" onclick="const d=document.getElementById('geminiSetupField');d.style.display=d.style.display==='none'?'block':'none';" style="background:none;border:none;color:#34a853;cursor:pointer;font-size:.8rem;padding:0 4px;">mostrar/ocultar</button>
+            </label>
+            <div id="geminiSetupField" style="display:none;">
+              <input id="setupGeminiKey" type="text" placeholder="AIzaSy..."
+                style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:.78rem; outline:none; box-sizing:border-box; transition:.2s; font-family:monospace;"
+                onfocus="this.style.borderColor='#34a853'; this.style.boxShadow='0 0 0 3px rgba(52,168,83,.15)'"
+                onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+              <div style="font-size:.76rem; color:#94a3b8; margin-top:4px;">Você pode adicionar depois em Backup → Configurações.</div>
+            </div>
+          </div>
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">
+              Chave API DeepSeek
+              <span style="color:#94a3b8; font-size:.8rem;">(opcional)</span>
+              <button type="button" onclick="const d=document.getElementById('deepseekSetupField');d.style.display=d.style.display==='none'?'block':'none';" style="background:none;border:none;color:#0b3c6f;cursor:pointer;font-size:.8rem;padding:0 4px;">mostrar/ocultar</button>
+            </label>
+            <div id="deepseekSetupField" style="display:none;">
+              <input id="setupDeepseekKey" type="text" placeholder="sk-..."
+                style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:.78rem; outline:none; box-sizing:border-box; transition:.2s; font-family:monospace;"
+                onfocus="this.style.borderColor='#0b3c6f'; this.style.boxShadow='0 0 0 3px rgba(11,60,111,.15)'"
+                onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+            </div>
+          </div>
+          <button onclick="femicSaveSetup()" style="
+            padding:14px; background:linear-gradient(135deg,#0b3c6f,#1fb6e9); color:#fff;
+            border:none; border-radius:14px; font-size:1rem; font-weight:700; cursor:pointer;
+            box-shadow:0 10px 24px rgba(11,60,111,.22); transition:.2s; margin-top:2px;
+          "
+            onmouseover="this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.transform=''">
+            Salvar e continuar →
+          </button>
+          <div id="setupError" style="color:#ef4444; text-align:center; font-size:.88rem; display:none; padding:4px 0;"></div>
+        </div>
+      </div>
+
+      <!-- PASSO 2: Login com email e senha -->
+      <div id="loginStep2" style="display:none;">
+        <div style="display:grid; gap:14px;">
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">Email</label>
+            <input id="loginEmail" type="email" placeholder="seu@email.com"
+              style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:1rem; outline:none; box-sizing:border-box; transition:.2s;"
+              onkeydown="if(event.key==='Enter')femicLogin()"
+              onfocus="this.style.borderColor='#1fb6e9'; this.style.boxShadow='0 0 0 3px rgba(31,182,233,.15)'"
+              onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+          </div>
+          <div>
+            <label style="display:block; font-size:.88rem; color:#678282; margin-bottom:6px;">Senha</label>
+            <input id="loginPassword" type="password" placeholder="••••••••"
+              style="width:100%; padding:13px 14px; border:1px solid #dde6e6; border-radius:14px; font-size:1rem; outline:none; box-sizing:border-box; transition:.2s;"
+              onkeydown="if(event.key==='Enter')femicLogin()"
+              onfocus="this.style.borderColor='#1fb6e9'; this.style.boxShadow='0 0 0 3px rgba(31,182,233,.15)'"
+              onblur="this.style.borderColor='#dde6e6'; this.style.boxShadow='none'">
+          </div>
+          <button id="loginBtn" onclick="femicLogin()" style="
+            padding:14px; background:linear-gradient(135deg,#0b3c6f,#1fb6e9); color:#fff;
+            border:none; border-radius:14px; font-size:1rem; font-weight:700; cursor:pointer;
+            box-shadow:0 10px 24px rgba(11,60,111,.22); transition:.2s;
+          "
+            onmouseover="this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.transform=''">
+            Entrar
+          </button>
+          <div id="loginError" style="color:#ef4444; text-align:center; font-size:.88rem; display:none; padding:4px 0;"></div>
+          <button onclick="femicShowSetup()" style="background:none; border:none; color:#94a3b8; font-size:.8rem; cursor:pointer; text-decoration:underline; padding:0;">
+            ⚙️ Alterar configuração do Supabase
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <img src="logo.png" alt="Logo FEMIC" class="brand-logo" />
+        <div class="brand-text">
+          <div class="wordmark"><span class="femic-navy">FEM</span><span class="femic-cyan">IC</span></div>
+          <small>Gestão clínica · Araraquara, SP</small>
+        </div>
+      </div>
+      <nav>
+        <div class="nav-link active" data-page="dashboard" onclick="goPage('dashboard')"><span class="icon">🏠</span><span>Dashboard</span></div>
+        <div class="nav-link" data-page="patients" onclick="goPage('patients')"><span class="icon">🧑‍⚕️</span><span>Pacientes</span></div>
+        <div class="nav-link" onclick="openAgendaModule()"><span class="icon">📅</span><span>Agenda</span></div>
+        <div class="nav-link" onclick="openDocumentsModule()"><span class="icon">📄</span><span>Documentos</span></div>
+        <div class="nav-link" data-page="analysis" onclick="goPage('analysis')"><span class="icon">📈</span><span>Análise</span></div>
+        <div class="nav-link" data-page="reports" onclick="goPage('reports')"><span class="icon">🧾</span><span>Relatórios</span></div>
+        <div class="nav-link" data-page="import" onclick="goPage('import')"><span class="icon">📥</span><span>Sincronização</span></div>
+        <div class="nav-link" data-page="backup" onclick="goPage('backup')"><span class="icon">☁️</span><span>Backup</span></div>
+        <div class="nav-link" onclick="showTutorial()"><span class="icon">❓</span><span>Tutorial</span></div>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="side-btn" onclick="toggleTheme()">🌓 Alternar tema</button>
+        <button class="side-btn" onclick="openAgendaModule()">📅 Abrir Agenda</button>
+        <button class="side-btn" onclick="goPage('backup')">☁️ Backup & restauração</button>
+        <button class="side-btn" onclick="femicLogout()" style="display:flex; align-items:center; gap:8px; border-color:rgba(239,68,68,.25); color:rgba(255,120,120,.9);">
+          <span>🚪</span><span id="loginUserLabel">Sair</span>
+        </button>
+        <div class="muted" style="font-size:.78rem; text-align:center; padding-top:4px;">Versão <strong id="appVersionLabel">v3.5.0-pwa</strong></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="page active" id="page-dashboard">
+        <div class="page-head">
+          <div>
+            <h2>Dashboard clínico</h2>
+            <p>Visão geral da evolução dos pacientes, taxa de melhora e distribuição por patologia.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn" onclick="refreshDashboard()">↻ Atualizar</button>
+            <button class="btn primary" onclick="openPatientModal()">+ Novo Paciente</button>
+          </div>
+        </div>
+        <div class="grid-4" id="statsGrid"></div>
+        <div class="grid-3" style="margin-top:16px;">
+          <div class="card" style="grid-column: span 1;">
+            <div class="card-title"><h3>Status de evolução</h3><small>Distribuição atual</small></div>
+            <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="card" style="grid-column: span 2;">
+            <div class="card-title"><h3>Evolução geral</h3><small>Últimas 15 sessões</small></div>
+            <div class="chart-wrap"><canvas id="overviewChart"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:16px;">
+          <div class="card">
+            <div class="card-title"><h3>Top 5 patologias com maior melhora</h3><small>Ranking por taxa</small></div>
+            <div class="rank-list" id="pathologyRanking"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Resumo rápido</h3><small>Indicadores-chave</small></div>
+            <div class="grid-2" id="quickKpis"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title"><h3>Alertas inteligentes</h3><small>Leitura automática dos dados atuais</small></div>
+          <div id="dashboardAlerts"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-patients">
+        <div class="page-head">
+          <div>
+            <h2>Pacientes</h2>
+            <p>Cadastro, busca, filtros por evolução e lançamento manual de sessões.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn primary" onclick="openPatientModal()">+ Novo Paciente</button>
+          </div>
+        </div>
+        <div class="patient-controls">
+          <input class="search" id="patientSearch" placeholder="Buscar por nome ou patologia..." oninput="renderPatients()" />
+          <div class="card" style="padding:12px;">
+            <div class="muted" style="font-size:.88rem;">Pacientes visíveis</div>
+            <div style="font-weight:800; font-size:1.35rem; margin-top:6px;" id="visiblePatientsCount">0</div>
+          </div>
+        </div>
+        <div class="tabs" id="patientTabs">
+          <button class="tab active" data-filter="active" onclick="setPatientFilter('active')">Ativos</button>
+          <button class="tab" data-filter="all" onclick="setPatientFilter('all')">Todos</button>
+          <button class="tab" data-filter="archived" onclick="setPatientFilter('archived'); loadArchivedPatients()">📦 Arquivados</button>
+          <button class="tab" data-filter="improved" onclick="setPatientFilter('improved')">✅ Melhoraram</button>
+          <button class="tab" data-filter="worsened" onclick="setPatientFilter('worsened')">❌ Pioraram</button>
+          <button class="tab" data-filter="stable" onclick="setPatientFilter('stable')">➡ Estáveis</button>
+          <button class="tab" data-filter="new" onclick="setPatientFilter('new')">🆕 Iniciando</button>
+        </div>
+        <div class="patients-grid" id="patientsGrid"></div>
+      </section>
+
+      <section class="page" id="page-analysis">
+        <div class="page-head">
+          <div>
+            <h2>Análise de evolução</h2>
+            <p>Histórico individual, gráfico clínico e detalhes completos por registro de evolução.</p>
+          </div>
+          <div class="toolbar" style="gap:8px; flex-wrap:wrap;">
+            <select class="search" id="analysisPatientSelect" onchange="renderAnalysis()" style="min-width:240px;"></select>
+            <button class="btn" onclick="openAnamneseModal()">📝 Anamnese</button>
+            <button class="btn" onclick="openClinicalEvolutionModal()">🩺 Evolução técnica</button>
+            <button class="btn" onclick="openDocumentsModal()">📎 Documentos</button>
+            <button class="btn success" onclick="sendWhatsAppToPatient(getSelectedAnalysisPatientId())">📲 Enviar formulário</button>
+          </div>
+        </div>
+        <div class="grid-4 analysis-summary" id="analysisCards"></div>
+        <div class="card">
+          <div class="card-title"><h3>Evolução técnica</h3><small>Gráfico de dor × funcionalidade</small></div>
+          <div class="chart-wrap"><canvas id="analysisChart"></canvas></div>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title"><h3>Histórico completo</h3><small>Ordem decrescente</small></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Data</th><th>Dor</th><th>Func.</th><th>Satisf.</th><th>Origem</th><th>Sintomas</th><th>Obs</th><th></th></tr>
+              </thead>
+              <tbody id="analysisTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:16px;">
+          <div class="card">
+            <div class="card-title"><h3>Anamnese</h3><small>Resumo inicial</small></div>
+            <div id="analysisAnamneseBox" class="muted">Selecione um paciente.</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Documentos</h3><small>Links do Google Drive</small></div>
+            <div id="analysisDocsBox" class="muted">Selecione um paciente.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-reports">
+        <div class="page-head">
+          <div>
+            <h2>Relatórios PDF</h2>
+            <p>Gere um resumo clínico elegante ou um histórico completo em PDF.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn success" onclick="downloadReportPdf()">⬇️ Baixar PDF</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="field"><label>Paciente</label><select id="reportPatientSelect" onchange="renderReportPreview()"></select></div>
+            <div class="field" style="margin-top:14px;"><label>Tipo de relatório</label><select id="reportTypeSelect" onchange="renderReportPreview()"><option value="complete">Completo</option><option value="summary">Resumo</option></select></div>
+          </div>
+          <div class="card">
+            <div class="muted">Preview em tempo real</div>
+            <div style="font-weight:800; font-size:1.2rem; margin-top:6px;">Relatório pronto para impressão</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div id="reportPreview" class="report-preview"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-import">
+        <div class="page-head">
+          <div>
+            <h2>Sincronização de dados</h2>
+            <p>Importe respostas por arquivo CSV ou sincronize automaticamente com a nuvem.</p>
+          </div>
+        </div>
+        <div class="alert">Você pode continuar usando CSV do Google Forms ou usar a nova página pública separada, que envia direto para a tabela <strong>patient_form_responses</strong>.</div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><h3>Sincronização automática (nuvem)</h3><small>Sem CSV</small></div>
+            <p class="muted">Lê a tabela <strong>patient_form_responses</strong> no Supabase, reconhece o paciente por WhatsApp/nome e cria as sessões automaticamente.</p>
+            <div class="toolbar">
+              <button class="btn primary" onclick="syncPatientResponsesFromCloud()">☁️ Sincronizar respostas da nuvem</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Importação por arquivo (CSV)</h3><small>Arraste ou selecione</small></div>
+            <div class="dropzone" id="dropzone" onclick="document.getElementById('csvFileInput').click()">
+              <div>
+                <div style="font-size:2rem;">📄</div>
+                <div style="font-weight:800; margin-top:10px;">Arraste o CSV aqui</div>
+                <div class="muted" style="margin-top:6px;">ou clique para selecionar um arquivo .csv</div>
+              </div>
+            </div>
+            <input id="csvFileInput" type="file" accept=".csv,text/csv" class="hidden" onchange="handleCsvFile(event)" />
+            <div id="csvFileMeta" class="muted" style="margin-top:12px;"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Link do formulário</h3><small>Salve para compartilhar</small></div>
+            <div class="field"><label>Link do formulário</label><input id="formsLinkInput" placeholder="https://forms.gle/..." /></div>
+            <div class="toolbar" style="margin-top:14px;">
+              <button class="btn primary" onclick="saveFormsLink()">💾 Salvar link</button>
+              <button class="btn" onclick="copyFormsLink()">📋 Copiar Link</button>
+              <button class="btn success" onclick="sendFormsWhatsApp()">📲 Enviar pelo WhatsApp</button>
+            </div>
+          </div>
+        </div>
+        
+
+        <div class="card hidden" id="mappingCard" style="margin-top:16px;">
+          <div class="card-title"><h3>Mapeamento de colunas</h3><small>Auto-detecção editável</small></div>
+          <div class="table-wrap">
+            <table class="mapping-table">
+              <thead><tr><th>Campo do Sistema</th><th>Coluna do CSV</th><th>Exemplo</th></tr></thead>
+              <tbody id="mappingTableBody"></tbody>
+            </table>
+          </div>
+          <div class="toolbar" style="margin-top:16px;">
+            <button class="btn primary" onclick="runCsvImport()">🚀 Importar CSV</button>
+            <button class="btn" onclick="resetCsvState()">Cancelar</button>
+          </div>
+        </div>
+        <div class="card hidden" id="importLogCard" style="margin-top:16px;">
+          <div class="card-title"><h3>Log de importação</h3><small id="importSummary">0 importadas</small></div>
+          <div id="importAlertMissing" class="alert hidden"></div>
+          <div class="log-box" id="importLog"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title">
+            <h3>Respostas pendentes</h3>
+            <small id="pendingResponsesCount">0 pendentes</small>
+          </div>
+          <p class="muted" style="margin-top:0;">Aqui ficam as respostas que o sistema não importou automaticamente. Você pode vincular manualmente, criar novo paciente ou ignorar.</p>
+          <div class="toolbar" style="margin-bottom:12px;">
+            <button class="btn" onclick="loadPendingResponses()">↻ Atualizar pendentes</button>
+            <button class="btn warning" onclick="resetImportedResponses()">↺ Reprocessar respostas</button>
+          </div>
+          <div id="pendingResponsesBox" class="muted">Nenhuma resposta pendente carregada.</div>
+        </div>
+      </section>
+
+      <section class="page" id="page-backup">
+        <div class="page-head">
+          <div>
+            <h2>Backup & restauração</h2>
+            <p>Exporte o sistema inteiro, restaure um JSON ou use o Supabase como cofre manual.</p>
+          </div>
+        </div>
+        <div class="alert">📅 Integração com Agenda: salve a agenda oficial como <strong>agenda.html</strong> na mesma pasta deste sistema. Pacientes cadastrados aqui serão sincronizados com a tabela <strong>patients</strong> do Supabase quando a configuração estiver preenchida.</div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><h3>A. Exportar JSON</h3><small>Backup local completo</small></div>
+            <p class="muted">Baixa pacientes, sessões, anamneses, evoluções técnicas e documentos em um arquivo JSON.</p>
+            <button class="btn primary" onclick="exportJsonBackup()">⬇️ Exportar JSON</button>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>B. Restaurar JSON</h3><small>Substitui dados clínicos locais</small></div>
+            <p class="muted">Mantém tema, links e configuração do Supabase.</p>
+            <input id="restoreJsonInput" type="file" accept="application/json" onchange="restoreJsonBackup(event)" />
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:16px;">
+          <div class="card">
+            <div class="card-title"><h3>C. Salvar na nuvem (Supabase)</h3><small>Backup manual</small></div>
+            <button class="btn primary" onclick="saveToSupabase()">☁️ Salvar na Nuvem</button>
+            <div id="supabaseConfigWrap" class="hidden" style="margin-top:16px; display:grid; gap:12px;">
+              <div class="field"><label>URL do projeto</label><input id="supabaseUrlInput" placeholder="https://ljblnrqeakpbjojuenjm.supabase.co" /></div>
+              <div class="field"><label>Chave anônima</label><input id="supabaseKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqYmxucnFlYWtwYmpvanVlbmptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODE5ODAsImV4cCI6MjA5MjM1Nzk4MH0.MDsXiO348tgrLMt4wUglpvJCfTmS6zrnw5tjIg3QJ7I" /></div>
+              <div class="field">
+                <label>IA padrão para preenchimento clínico</label>
+                <select id="aiProviderInput">
+                  <option value="gemini">Google Gemini (2.5 Flash)</option>
+                  <option value="deepseek">DeepSeek</option>
+                </select>
+              </div>
+              <label style="display:flex; align-items:center; gap:8px; color:var(--muted); font-size:.88rem;">
+                <input id="aiConciseInput" type="checkbox" checked />
+                Modo econômico de tokens (resposta mais concisa)
+              </label>
+              <div class="field">
+                <label>Chave API Google Gemini (2.5 Flash) <span class="muted" style="font-size:.8rem;">(IA na anamnese)</span></label>
+                <input id="geminiKeyInput" type="text" placeholder="AIzaSy..." style="font-family:monospace; font-size:.85rem;" />
+                <div class="muted" style="font-size:.78rem; margin-top:5px;">A chave fica salva apenas neste navegador, nunca no GitHub.</div>
+              </div>
+              <div class="field">
+                <label>Chave API DeepSeek <span class="muted" style="font-size:.8rem;">(IA na anamnese e evolução)</span></label>
+                <input id="deepseekKeyInput" type="text" placeholder="sk-..." style="font-family:monospace; font-size:.85rem;" />
+              </div>
+              <div class="toolbar">
+                <button class="btn primary" onclick="saveSupabaseConfig()">💾 Salvar</button>
+                <button class="btn" onclick="testSupabaseConnection()">🔌 Testar Conexão</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>D. Restaurar da nuvem</h3><small>Baixa do Supabase</small></div>
+            <button class="btn" onclick="restoreFromSupabase()">⬇️ Restaurar da Nuvem</button>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:16px;">
+          <div class="card backup-note">
+            <div class="card-title"><h3>E. Lembrete de backup</h3><small>Segurança dos dados</small></div>
+            <p>💡 Os dados ficam salvos no navegador deste computador. Se limpar o cache ou trocar de máquina, serão perdidos. Salve na nuvem ou exporte o JSON todo dia ao fechar.</p>
+            <p id="lastBackupText" class="muted"></p>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>F. Limpar dados</h3><small>Ação irreversível</small></div>
+            <button class="btn danger" onclick="clearAllData()">🗑 Limpar todos os dados</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="patientModalWrap">
+    <div class="modal sm">
+      <div class="modal-head"><h3 id="patientModalTitle">Novo paciente</h3><button class="btn-icon" onclick="closeModal('patientModalWrap')">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="patientEditId" />
+        <div class="field"><label>Nome completo *</label><input id="patientName" /></div>
+        <div class="field" style="margin-top:12px;"><label>Patologia</label><input id="patientPathology" /></div>
+        <div class="field" style="margin-top:12px;"><label>WhatsApp *</label><input id="patientWhatsapp" placeholder="(99) 99999-9999" inputmode="numeric" autocomplete="tel" oninput="applyWhatsappMask(this)" /></div>
+        <div id="patientEditHint" class="alert hidden" style="margin-top:14px;">Alterar o nome do paciente não afeta sessões já importadas; elas continuam vinculadas pelo ID interno.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('patientModalWrap')">Cancelar</button>
+        <button class="btn primary" onclick="savePatient()">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="sessionModalWrap">
+    <div class="modal">
+      <div class="modal-head"><h3>Novo registro de evolução</h3><button class="btn-icon" onclick="closeModal('sessionModalWrap')">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="sessionPatientId" />
+        <div class="two-col">
+          <div class="field"><label>Data</label><input type="date" id="sessionDate" /></div>
+          <div class="field"><label>Nome do paciente</label><input id="sessionPatientName" readonly /></div>
+        </div>
+        <div class="two-col" style="margin-top:14px;">
+          <div class="field">
+            <label>Dor (0–10)</label>
+            <div class="range-row"><input type="range" id="sessionPain" min="0" max="10" step="1" value="5" oninput="document.getElementById('sessionPainVal').textContent=this.value" /><strong id="sessionPainVal">5</strong></div>
+          </div>
+          <div class="field">
+            <label>Funcionalidade (0–10)</label>
+            <div class="range-row"><input type="range" id="sessionFunctionality" min="0" max="10" step="1" value="5" oninput="document.getElementById('sessionFuncVal').textContent=this.value" /><strong id="sessionFuncVal">5</strong></div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label>Satisfação</label>
+          <div class="stars" id="sessionStars"></div>
+          <input type="hidden" id="sessionSatisfaction" value="0" />
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label>Sintomas</label>
+          <div class="symptoms-grid" id="symptomsGrid"></div>
+        </div>
+        <div class="field" style="margin-top:14px;"><label>Observações</label><textarea id="sessionObs" rows="4"></textarea></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('sessionModalWrap')">Cancelar</button>
+        <button class="btn primary" onclick="saveManualSession()">💾 Salvar registro</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="sessionDetailsWrap">
+    <div class="modal sm">
+      <div class="modal-head"><h3>Detalhes do registro de evolução</h3><button class="btn-icon" onclick="closeModal('sessionDetailsWrap')">✕</button></div>
+      <div class="modal-body" id="sessionDetailsBody"></div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal('sessionDetailsWrap')">Fechar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="deleteModalWrap">
+    <div class="modal sm">
+      <div class="modal-head"><h3 id="deleteTitle">Confirmar exclusão</h3><button class="btn-icon" onclick="closeModal('deleteModalWrap')">✕</button></div>
+      <div class="modal-body">
+        <div id="deleteBody"></div>
+        <input type="hidden" id="deletePid" />
+        <input type="hidden" id="deleteSid" />
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('deleteModalWrap')">Cancelar</button>
+        <button class="btn danger" id="deleteConfirmBtn">🗑 Sim, remover</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="tutorialWrap">
+    <div class="modal">
+      <div class="modal-head"><h3>Tutorial do sistema</h3><button class="btn-icon" onclick="closeModal('tutorialWrap')">✕</button></div>
+      <div class="modal-body">
+        <div class="card" style="margin-bottom:16px;">
+          <strong>Sistema FEMIC Fisioterapia</strong>
+          <p class="muted" style="margin-top:6px;">Versão atual: <strong id="tutorialVersionLabel">v3.5.0-pwa</strong></p>
+          <p class="muted" style="margin-top:6px;">Fluxo recomendado: cadastro, evolução, IA clínica, análise, orientações, sincronização e backup seguro.</p>
+        </div>
+        <div class="grid-2">
+          <div class="card"><strong>1. Dashboard clínico</strong><p class="muted">Monitore pacientes, evolução, taxa de melhora e alertas rápidos da operação clínica.</p></div>
+          <div class="card"><strong>2. Pacientes ativos e arquivados</strong><p class="muted">Cadastre e organize pacientes sem perder histórico, com filtros por status e busca por nome/patologia.</p></div>
+          <div class="card"><strong>3. Evolução de sessão</strong><p class="muted">Registre dor, funcionalidade, sintomas, satisfação e observações para alimentar análise e relatórios.</p></div>
+          <div class="card"><strong>4. Anamnese e evolução técnica com IA</strong><p class="muted">Use Gemini ou DeepSeek, com modo econômico de tokens, para preenchimento mais rápido e objetivo.</p></div>
+          <div class="card"><strong>5. Ditado por voz e produtividade</strong><p class="muted">No modal de evolução técnica, use IA e depois ditado por voz para complementar com agilidade.</p></div>
+          <div class="card"><strong>6. Orientações ao paciente</strong><p class="muted">Envie orientações por WhatsApp com links por patologia e histórico de envios por paciente.</p></div>
+          <div class="card"><strong>7. Sincronização e pendências</strong><p class="muted">Importe respostas por CSV ou Supabase, revise pendências e vincule manualmente quando necessário.</p></div>
+          <div class="card"><strong>8. Backup, PWA e segurança</strong><p class="muted">Exporte JSON, use backup em nuvem e instale como App da Web (PWA) sem comprometer sincronização.</p></div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn primary" onclick="closeModal('tutorialWrap')">Entendi</button></div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="anamneseModalWrap">
+    <div class="modal lg">
+      <div class="modal-head"><h3>Ficha de anamnese</h3><button class="btn-icon" onclick="closeModal('anamneseModalWrap')">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="anamnesePatientId" />
+        <div class="field"><label>Paciente</label><input id="anamnesePatientName" readonly /></div>
+        <div class="field" style="margin-top:12px;"><label>Queixa principal</label><textarea id="anamneseChief" rows="2"></textarea></div>
+        <div class="field" style="margin-top:12px;"><label>História atual</label><textarea id="anamneseHistory" rows="3"></textarea></div>
+        <div class="field" style="margin-top:12px;"><label>Diagnóstico / hipótese</label><textarea id="anamneseDiagnosis" rows="2"></textarea></div>
+        <div class="field" style="margin-top:12px;"><label>Limitações funcionais</label><textarea id="anamneseLimitations" rows="2"></textarea></div>
+        <div class="grid-2" style="margin-top:12px;">
+          <div class="field"><label>Comorbidades</label><textarea id="anamneseComorbidities" rows="2"></textarea></div>
+          <div class="field"><label>Medicamentos / cirurgias</label><textarea id="anamneseMedications" rows="2"></textarea></div>
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Objetivos do tratamento</label><textarea id="anamneseGoals" rows="2"></textarea></div>
+        <div class="field" style="margin-top:12px;"><label>Observações</label><textarea id="anamneseObs" rows="3"></textarea></div>
+
+        <!-- ✨ GEMINI AI — Assistente de preenchimento de anamnese -->
+        <div class="gemini-card" id="geminiAnamneseCard">
+          <h4>✨ Preencher anamnese com IA</h4>
+          <div class="field" style="margin-bottom:10px;">
+            <label>Modelo de IA</label>
+            <select id="geminiAnamneseProvider">
+              <option value="gemini">Google Gemini (2.5 Flash)</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; color:var(--muted); font-size:.85rem; margin-bottom:10px;">
+            <input id="geminiAnamneseConcise" type="checkbox" checked onchange="setAiConciseMode(this.checked)" />
+            Modo econômico de tokens (resposta mais curta)
+          </label>
+          <div class="field">
+            <label style="font-size:.88rem; color:var(--muted); margin-bottom:6px; display:block;">
+              Descreva o caso em linguagem livre — a IA preenche os campos automaticamente
+            </label>
+            <textarea
+              class="gemini-textarea"
+              id="geminiAnamneseInput"
+              placeholder="Ex.: Paciente de 45 anos, sexo feminino, com dor lombar há 3 meses, piora ao se abaixar e ao ficar sentada por muito tempo. Trabalha como professora. Tem hipertensão controlada com losartana. Nunca fez cirurgia. Quer voltar a caminhar sem dor e retomar as atividades escolares."
+            ></textarea>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; align-items:center;">
+            <button class="gemini-btn" id="geminiAnamneseBtn" onclick="runGeminiAnamnese()">
+              ✨ Preencher com IA
+            </button>
+            <button class="btn small ghost" onclick="document.getElementById('geminiAnamneseInput').value=''; document.getElementById('geminiAnamneseStatus').textContent=''; document.getElementById('geminiAnamneseStatus').className='gemini-status';">
+              Limpar
+            </button>
+          </div>
+          <div class="gemini-status" id="geminiAnamneseStatus"></div>
+          <div class="gemini-hint">
+            💡 A IA sugere um preenchimento baseado no que você descrever. Revise e edite os campos antes de salvar — você tem controle total sobre o conteúdo.
+          </div>
+        </div>
+
+        <details class="assist-card compact-collapsible">
+          <summary>⚡ Modelos premium de anamnese</summary>
+          <h4>⚡ Modelos premium de anamnese</h4>
+          <div class="assist-grid">
+            <div class="field">
+              <label>Modelo de queixa / história</label>
+              <select id="anamneseTemplateSelect">
+                <option value="">Selecione um modelo</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Inserção rápida</label>
+              <button class="btn" type="button" onclick="applyAnamneseTemplate()">Inserir modelo</button>
+            </div>
+          </div>
+          <div class="phrase-bank" id="anamnesePhraseBank"></div>
+          <div class="assist-note">Os modelos e frases só ajudam a preencher mais rápido. Você pode editar tudo normalmente.</div>
+        </details>
+      </div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal('anamneseModalWrap')">Cancelar</button><button class="btn primary" onclick="saveAnamnese()">💾 Salvar anamnese</button></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="clinicalEvolutionModalWrap">
+    <div class="modal lg">
+      <div class="modal-head"><h3>Evolução técnica</h3><button class="btn-icon" onclick="closeModal('clinicalEvolutionModalWrap')">✕</button></div>
+      <div class="modal-body">
+        <input type="hidden" id="clinicalPatientId" />
+        <div class="grid-2">
+          <div class="field"><label>Paciente</label><input id="clinicalPatientName" readonly /></div>
+          <div class="field"><label>Data</label><input id="clinicalDate" type="date" /></div>
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Conduta realizada</label><textarea id="clinicalConduct" rows="3" placeholder="Ex.: mobilização, liberação, exercícios, orientações durante o atendimento"></textarea></div>
+
+        <div class="field" style="margin-top:12px;"><label>Orientações / conduta domiciliar</label><textarea id="clinicalGuidance" rows="3" placeholder="Ex.: gelo 15 min, exercícios 2x ao dia, evitar sobrecarga"></textarea></div>
+
+        <!-- ✨ GEMINI AI — Assistente de preenchimento de evolução técnica -->
+        <div class="gemini-card" id="geminiClinicalCard" style="margin-top:14px;">
+          <h4>✨ Preencher evolução com IA</h4>
+          <div class="field" style="margin-bottom:10px;">
+            <label>Modelo de IA</label>
+            <select id="geminiClinicalProvider">
+              <option value="gemini">Google Gemini (2.5 Flash)</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; color:var(--muted); font-size:.85rem; margin-bottom:10px;">
+            <input id="geminiClinicalConcise" type="checkbox" checked onchange="setAiConciseMode(this.checked)" />
+            Modo econômico de tokens (resposta mais curta)
+          </label>
+          <div class="field">
+            <label style="font-size:.88rem; color:var(--muted); margin-bottom:6px; display:block;">
+              Descreva o atendimento em linguagem livre — a IA preenche conduta e orientações automaticamente
+            </label>
+            <textarea
+              class="gemini-textarea"
+              id="geminiClinicalInput"
+              placeholder="Ex.: Paciente com lombalgia, realizamos mobilização de coluna lombar, agachamento em cadeia fechada 3x15, exercício de ponte glútea 3x12. Boa tolerância, dor de 4 para 2. Orientei sobre postura ao sentar e gelo em casa."
+            ></textarea>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; align-items:center;">
+            <button class="gemini-btn" id="geminiClinicalBtn" onclick="runGeminiClinicalEvolution()">
+              ✨ Preencher com IA
+            </button>
+            <button class="btn small ghost" onclick="document.getElementById('geminiClinicalInput').value=''; document.getElementById('geminiClinicalStatus').textContent=''; document.getElementById('geminiClinicalStatus').className='gemini-status';">
+              Limpar
+            </button>
+          </div>
+          <div class="gemini-status" id="geminiClinicalStatus"></div>
+          <div class="gemini-hint">
+            💡 A IA gera uma conduta e orientações domiciliares com base no que você descrever. Revise e edite antes de salvar — você tem controle total.
+          </div>
+        </div>
+
+        <div class="voice-evo-card">
+          <div class="voice-evo-head">
+            <div>
+              <h4>🎙️ Ditado por voz</h4>
+              <div class="muted" style="font-size:.86rem;margin-top:3px;">Fale a evolução e revise o texto antes de salvar.</div>
+            </div>
+          </div>
+          <div class="voice-evo-controls">
+            <div class="field">
+              <label>Enviar fala para</label>
+              <select id="clinicalVoiceTarget">
+                <option value="clinicalConduct">Conduta realizada</option>
+                <option value="clinicalGuidance">Orientações / conduta domiciliar</option>
+              </select>
+            </div>
+            <button class="btn primary" type="button" onclick="startClinicalVoiceDictation()">🎙️ Falar</button>
+            <button class="btn" type="button" onclick="stopClinicalVoiceDictation()">■ Parar</button>
+          </div>
+          <div id="clinicalVoiceStatus" class="voice-status">Microfone desligado.</div>
+          <div class="voice-quick-hint">Exemplo: “Paciente realizou fortalecimento de joelho direito, três séries de dez, boa tolerância, dor leve ao agachar.”</div>
+        </div>
+
+        <details class="assist-card compact-collapsible">
+          <summary>⚡ Modelos premium de evolução técnica</summary>
+          <h4>⚡ Modelos premium de evolução técnica</h4>
+          <div class="assist-grid">
+            <div class="field">
+              <label>Modelo de conduta</label>
+              <select id="clinicalTemplateSelect">
+                <option value="">Selecione um modelo</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Inserção rápida</label>
+              <button class="btn" type="button" onclick="applyClinicalTemplate()">Inserir modelo</button>
+            </div>
+          </div>
+          <div class="phrase-bank" id="clinicalPhraseBank"></div>
+          <div class="assist-note">Use os modelos para acelerar o preenchimento de exercícios, séries, repetições e orientações domiciliares.</div>
+        </details>
+
+        <details class="card compact-collapsible" style="margin-top:16px; padding:14px;">
+          <summary>🕘 Registros recentes</summary>
+          <div class="card-title"><h3>Registros recentes</h3><small>Últimas evoluções</small></div>
+          <div id="clinicalEvolutionList" class="muted">Nenhum registro ainda.</div>
+        </details>
+      </div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal('clinicalEvolutionModalWrap')">Fechar</button><button class="btn primary" onclick="saveClinicalEvolution()">💾 Salvar evolução</button></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="documentsModalWrap">
+    <div class="modal lg">
+      <div class="modal-head">
+        <h3>📎 Documentos e Guias — <span id="documentsPatientNameHead"></span></h3>
+        <button class="btn-icon" onclick="closeModal('documentsModalWrap')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="documentsPatientId" />
+        <input type="hidden" id="documentsPatientName" />
+
+        <!-- Abas internas -->
+        <div class="tabs" style="margin-bottom:18px;">
+          <button class="tab active" onclick="switchDocTab('docs',this)">📄 Documentos</button>
+          <button class="tab" onclick="switchDocTab('guias',this)">🏥 Guias de Convênio</button>
+        </div>
+
+        <!-- ABA: Documentos -->
+        <div id="docTabDocs">
+          <div class="grid-2" style="margin-bottom:12px;">
+            <div class="field"><label>Título do documento</label><input id="documentTitle" placeholder="Ex.: Ressonância lombar" /></div>
+            <div class="field"><label>Categoria</label>
+              <select id="documentCategory" style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); font-size:.95rem;">
+                <option value="">Selecione a categoria</option>
+                <option>Exame de imagem</option>
+                <option>Laudo médico</option>
+                <option>Receita / Prescrição</option>
+                <option>Encaminhamento</option>
+                <option>Relatório fisioterapêutico</option>
+                <option>Outro</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label>Link do Google Drive</label><input id="documentUrl" placeholder="https://drive.google.com/..." /></div>
+          <div class="field" style="margin-top:10px;"><label>Observação</label><textarea id="documentObs" rows="2"></textarea></div>
+          <div class="toolbar" style="margin-top:12px;"><button class="btn primary" onclick="savePatientDocument()">➕ Adicionar documento</button></div>
+          <div class="card" style="margin-top:16px; padding:14px;">
+            <div class="card-title"><h3>Documentos salvos</h3></div>
+            <div id="documentsList" class="muted">Nenhum documento salvo.</div>
+          </div>
+        </div>
+
+        <!-- ABA: Guias de Convênio -->
+        <div id="docTabGuias" style="display:none;">
+          <div style="
+            background:linear-gradient(135deg,#f0f9ff,#e0f2fe);
+            border:1.5px solid #bae6fd; border-radius:16px;
+            padding:16px; margin-bottom:18px;
+          ">
+            <strong style="color:#0369a1; font-size:.95rem;">📋 Nova guia de convênio</strong>
+            <div class="grid-2" style="margin-top:12px; gap:12px;">
+              <div class="field">
+                <label>Convênio</label>
+                <select id="guiaConvenio" style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); font-size:.95rem;">
+                  <option value="">Selecione</option>
+                  <option>Unimed</option>
+                  <option>Hapvida</option>
+                  <option>NotreDame Intermédica</option>
+                  <option>Amil</option>
+                  <option>SulAmérica</option>
+                  <option>Bradesco Saúde</option>
+                  <option>Particular</option>
+                  <option>Outro</option>
+                </select>
+              </div>
+              <div class="field"><label>Número da guia</label><input id="guiaNumero" placeholder="Ex.: 123456789"></div>
+              <div class="field"><label>Data de autorização</label><input id="guiaDataAuth" type="date"></div>
+              <div class="field"><label>Validade da guia</label><input id="guiaValidade" type="date"></div>
+              <div class="field"><label>Sessões autorizadas</label><input id="guiaSessoesAuth" type="number" min="1" placeholder="Ex.: 20"></div>
+              <div class="field"><label>Sessões já realizadas</label><input id="guiaSessoesUsadas" type="number" min="0" placeholder="Ex.: 6"></div>
+            </div>
+            <div class="field" style="margin-top:10px;"><label>Observações</label><textarea id="guiaObs" rows="2" placeholder="Procedimento autorizado, CID, restrições..."></textarea></div>
+            <div class="field" style="margin-top:10px;"><label>Link da guia (Google Drive)</label><input id="guiaDriveUrl" placeholder="https://drive.google.com/..."></div>
+            <div class="toolbar" style="margin-top:12px;">
+              <button class="btn primary" onclick="saveGuiaConvenio()">💾 Salvar guia</button>
+            </div>
+          </div>
+
+          <div id="guiasList"><div class="muted">Nenhuma guia cadastrada.</div></div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn" onclick="closeModal('documentsModalWrap')">Fechar</button></div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="orientationPackModalWrap">
+    <div class="modal sm">
+      <div class="modal-head">
+        <h3>Enviar orientações</h3>
+        <button class="btn-icon" onclick="closeModal('orientationPackModalWrap')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Paciente</label>
+          <input id="orientationPatientName" readonly />
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Patologia cadastrada</label>
+          <input id="orientationPatientPathology" readonly />
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Orientação sugerida</label>
+          <div id="orientationSuggestedPack" class="meta-pill" style="min-width:0;">Geral</div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Selecionar orientação manualmente</label>
+          <select id="orientationPackSelect"></select>
+          <div class="muted" style="font-size:.84rem; margin-top:6px;">Você pode trocar a orientação antes de abrir o WhatsApp.</div>
+        </div>
+        <div class="card" style="margin-top:16px; padding:14px;">
+          <div class="card-title"><h3>Histórico de envio</h3><small>Últimos envios deste paciente</small></div>
+          <div id="orientationHistoryBox" class="muted">Nenhum envio registrado.</div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('orientationPackModalWrap')">Cancelar</button>
+        <button class="btn primary" onclick="sendOrientationPackConfirmed()">📤 Abrir WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw-femic.js').catch(function (err) {
+        console.warn('SW FEMIC não registrado:', err);
+      });
+    });
+  }
+</script>
+<script src="js/femic-data.js"></script>
+<script src="js/femic-app.js"></script>
+</body>
+</html>
+
